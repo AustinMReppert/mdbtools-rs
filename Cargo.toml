@@ -1,0 +1,31 @@
+[package]
+name = "mdtools-rs"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+encoding_rs = "0.8.31"
+clap = { version = "4.0.32", features = ["derive"] }
+chrono = "0.4.23"
+
+[lib]
+name = "mdbtools"
+path = "src/lib.rs"
+
+[[bin]]
+name = "mdb-export"
+path = "src/bin/export.rs"
+
+[[bin]]
+name = "mdb-schema"
+path = "src/bin/schema.rs"
+
+[[bin]]
+name = "mdb-tables"
+path = "src/bin/tables.rs"
+
+[[bin]]
+name = "mdb-version"
+path = "src/bin/version.rs"
