@@ -1,3 +1,4 @@
 # mdbtools-rs
 
-This a port of mdb-tools. Only the libmdb and utilities are currently being worked on.
+This a port of [mdb-tools](https://github.com/mdbtools/mdbtools).
+Only the libmdb and utilities are currently being worked on.
