@@ -20,6 +20,7 @@ pub struct Backend<'a> {
 
   pub quote_name: fn(name: &str) -> String,
   pub default_quote_str: &'a str,
+  pub default_null_str: &'a str,
 
   pub create_table_string: &'a str,
   pub column_string: &'a str,
@@ -99,12 +100,13 @@ pub const POSTGRES_BACKEND: Backend = Backend {
   mdb_memo: BackendType::new("TEXT"),
   mdb_replication_id: BackendType::new("UUID"),
   mdb_numeric: BackendType::new("NUMERIC").needs_precision().needs_scale(),
-  mdb_extended_datetime: BackendType::new("DATETIME2"),
+  mdb_extended_datetime: BackendType::new("TIMESTAMP"),
   mdb_complex: BackendType::new("complex?"),
   quote_name: quote_double_quotes,
 
   default_quote_str: "'",
-  create_table_string: "",
+  default_null_str: "NULL",
+  create_table_string: "CREATE TABLE IF NOT EXISTS {quoted_table_name} (",
   column_string: r#"{quoted_column_name} {column_type}"#
 };
 
@@ -138,6 +140,7 @@ pub const MSSQL_BACKEND: Backend = Backend {
   quote_name: quote_name_brackets,
 
   default_quote_str: "'",
+  default_null_str: "NULL",
   create_table_string: "IF OBJECT_ID(N'{quoted_table_name}', N'U') IS NULL\n  create table {quoted_table_name} (",
 
   column_string: "  {quoted_column_name} {column_type}"
@@ -165,6 +168,7 @@ pub const CSV_BACKEND: Backend = Backend {
   create_table_string: "",
   column_string: "",
   default_quote_str: "\"",
+  default_null_str: "",
 };
 
 /// Double the quote char and surround with quote.

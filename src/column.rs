@@ -188,8 +188,7 @@ impl Column {
 
       let mut page_row = get_u32(&self.buffer.value, 4);
       let mut temp_offset = 0;
-      let mut buffer: Vec<u8> = Vec::with_capacity(memo_length as usize);
-      buffer.resize(memo_length as usize, 0);
+      let mut buffer: Vec<u8> = vec![0; memo_length];
 
       loop {
         let usage_map = match mdb_find_page_row_packed(&mut mdb, page_row) {
@@ -238,7 +237,7 @@ impl Column {
       ColumnType::Binary => backend.mdb_binary,
       ColumnType::Text => backend.mdb_text,
       ColumnType::OLE => backend.mdb_ole,
-      ColumnType::Memo => backend.mdb_ole,
+      ColumnType::Memo => backend.mdb_memo,
       ColumnType::ReplicationId => backend.mdb_replication_id,
       ColumnType::Numeric => backend.mdb_numeric,
       ColumnType::Complex => backend.mdb_complex,
@@ -251,6 +250,15 @@ impl Column {
 impl Display for Column {
 
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+
+    if self.buffer.is_null {
+      match self.column_type {
+        ColumnType::Bool => (),
+        _ => {
+          return write!(f, "NULL");
+        }
+      }
+    }
 
     match self.column_type {
       ColumnType::Int => {

@@ -47,9 +47,9 @@ struct Args {
   #[arg(short = 'b', long, default_value_t = String::from("csv"))]
   backend: String,
 
-  /// Null specifier. Default is "".
-  #[arg(short = 'n', long, default_value_t = String::from(""))]
-  null: String,
+  /// Null specifier. Default is backend specific.
+  #[arg(short = 'n', long)]
+  null: Option<String>,
 
   /// Schema/namespace. Default is "".
   #[arg(short = 's', long, default_value_t = String::from(""))]
@@ -134,6 +134,8 @@ pub fn main() -> ExitCode {
     println!(")\nVALUES");
   }
 
+  let null = args.null.unwrap_or(backend.default_null_str.to_string());
+
   let mut first = true;
   loop {
     let _result = match table.fetch_row() {
@@ -159,9 +161,21 @@ pub fn main() -> ExitCode {
         print!(",");
       }
 
-      let mut col_string = col.to_string();
+      let mut is_null = false;
+      let mut col_string = match col.buffer.is_null {
+        true => {
+          match col.column_type {
+            ColumnType::Bool => col.to_string(),
+            _ => {
+              is_null = true;
+              null.clone()
+            }
+          }
+        }
+        false => col.to_string()
+      };
 
-      let should_quote = should_quote(col.column_type);
+      let should_quote = !is_null && should_quote(col.column_type);
       if should_quote && !args.no_quote {
         col_string = backend::quote_generic(&col_string, backend.default_quote_str, &args.escape);
       }
@@ -206,5 +220,5 @@ fn print_header(args: &Args, table: &mut Table) {
 }
 
 fn should_quote(column_type: ColumnType) -> bool {
-  matches!(column_type, ColumnType::Text | ColumnType::Memo | ColumnType::Datetime | ColumnType::ExtendedDatetime)
+  matches!(column_type, ColumnType::Text | ColumnType::Bool | ColumnType::Memo | ColumnType::Datetime | ColumnType::ExtendedDatetime)
 }
