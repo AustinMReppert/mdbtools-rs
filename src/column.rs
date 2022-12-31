@@ -283,6 +283,15 @@ impl Display for Column {
         }
         write!(f, "{}", decode_mdb_string(self.format, self.encoding, &self.buffer.value).expect("Failed to convert"))
       },
+      ColumnType::Binary => {
+        if self.buffer.is_null {
+          return write!(f, "");
+        }
+        for byte in &self.buffer.value {
+          write!(f, "{:x}", byte)?
+        }
+        Ok(())
+      },
       ColumnType::Memo => {
         write!(f, "{}", self.column_text.as_ref().unwrap())
       }

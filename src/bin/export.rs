@@ -28,7 +28,7 @@ struct Args {
   delimiter: String,
 
   /// Table name.
-  #[arg(short = 't', long = "table")]
+  #[arg(short = 'T', long = "table")]
   table: String,
 
   /// Path to file.
@@ -179,7 +179,7 @@ pub fn main() -> ExitCode {
       if should_quote && !args.no_quote {
         col_string = backend::quote_generic(&col_string, backend.default_quote_str, &args.escape);
       }
-
+      // TODO: format binary literal.
       print!("{}", col_string);
 
       if index == table.columns.len() - 1 {
@@ -192,7 +192,7 @@ pub fn main() -> ExitCode {
   }
 
   if backend != backend::CSV_BACKEND {
-    println!("\n);");
+    println!(");");
   }
 
   ExitCode::SUCCESS

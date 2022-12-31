@@ -45,6 +45,10 @@ struct Args {
   /// Schema/namespace. Default is "".
   #[arg(short = 's', long)]
   schema: Option<String>,
+
+  /// Table name.
+  #[arg(short = 'T', long)]
+  table: Option<String>,
 }
 
 pub fn main() -> ExitCode {
@@ -84,6 +88,9 @@ pub fn main() -> ExitCode {
   for catalog_entry in catalog {
     match catalog_entry {
       CatalogEntry::Table(table) => {
+        if args.table.is_some() && !args.table.as_ref().unwrap().eq(&table.name) {
+          continue;
+        }
         print_table_schema(table, &args, &mut mdb, &backend);
       }
     }
@@ -93,7 +100,7 @@ pub fn main() -> ExitCode {
 }
 
 fn print_table_schema(table: TableCatalogEntry, args: &Args, mdb: &mut Mdb, backend: &Backend) {
-  if table.is_system_table() {
+  if table.is_system_table() && args.table.is_none() {
     return;
   }
 
