@@ -4,12 +4,6 @@ use crate::error::MdbError;
 use crate::mdbfile::{Mdb};
 use crate::utils::get_u32;
 
-pub struct OldUsageMap {
-  pub mdb: Mdb,
-  pub start: u16,
-  pub length: u16,
-}
-
 // A bunch of false bits to read from.
 const FALSE_BITS: [u8; 4092] = [0; 4092];
 
@@ -20,9 +14,13 @@ pub struct UsageMap {
 
 impl UsageMap {
   /// Loads a usage map from the raw mdb bytes.
-  pub fn from_raw(mdb: &Mdb, buffer: &[u8]) -> Result<(UsageMap), MdbError> {
-    let mut mdb = mdb.clone();
-    match buffer[0] {
+  pub fn from_raw(mdb: &mut Mdb, buffer: &[u8]) -> Result<(UsageMap), MdbError> {
+
+    if buffer.is_empty() {
+      return Err(MdbError::UsageMapInvalidSize);
+    }
+
+      match buffer[0] {
       0 => {
         let start_page = get_u32(buffer, 1);
         let pages = BitVec::from_slice(&buffer[5..]);

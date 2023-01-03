@@ -7,6 +7,7 @@ use crate::backend::{Backend, BackendType};
 
 use crate::conversion::decode_mdb_string;
 use crate::data::{ColBuffer, mdb_find_page_row_packed};
+use crate::error::MdbError;
 use crate::mdbfile::{Mdb, MdbFormatVersion};
 use crate::money::money_column_to_string;
 use crate::numeric::numeric_column_to_string;
@@ -150,7 +151,7 @@ impl TryFrom<u8> for ColumnType {
 }
 
 impl Column {
-  pub fn get_memo_string(&self, mdb: &Mdb) -> Result<String, ()> {
+  pub fn get_memo_string(&self, mdb: &Mdb) -> Result<String, MdbError> {
     let mut mdb = mdb.clone();
 
     const MEMO_OVERHEAD: usize = 12;
@@ -175,15 +176,8 @@ impl Column {
       /* single-page memo field */
       let page_row = get_u32(&self.buffer.value, 4);
 
-      match mdb_find_page_row_packed(&mut mdb, page_row) {
-        Ok(usage_map) => {
-          decode_mdb_string(usage_map.mdb.mdb_file.jet_version, usage_map.mdb.encoding, &usage_map.mdb.page_buffer[(usage_map.start as usize)..(usage_map.start + usage_map.length) as usize])
-        }
-        Err(_) => {
-          Err(())
-        }
-      }
-
+      let memo_row =  mdb_find_page_row_packed(&mut mdb, page_row)?;
+      decode_mdb_string(mdb.mdb_file.jet_version, mdb.encoding, &mdb.page_buffer[(memo_row.start as usize)..(memo_row.start + memo_row.length) as usize])
     } else if (memo_length & 0xff000000) == 0 {
 
       let mut page_row = get_u32(&self.buffer.value, 4);
@@ -191,24 +185,21 @@ impl Column {
       let mut buffer: Vec<u8> = vec![0; memo_length];
 
       loop {
-        let usage_map = match mdb_find_page_row_packed(&mut mdb, page_row) {
-          Ok(res) => res,
-          Err(_) => return Err(())
-        };
+        let memo_string_row = mdb_find_page_row_packed(&mut mdb, page_row)?;
 
-        if temp_offset + usage_map.length as usize - 4 > memo_length {
+        if temp_offset + memo_string_row.length as usize - 4 > memo_length {
           break;
         }
 
         /* Stop processing on zero length multiple page memo fields */
-        if usage_map.length < 4 {
+        if memo_string_row.length < 4 {
           break;
         }
 
-        buffer[(temp_offset as usize)..((temp_offset + usage_map.length as usize - 4) as usize)].copy_from_slice(&usage_map.mdb.page_buffer[(usage_map.start as usize + 4)..(usage_map.start as usize + 4 + usage_map.length as usize - 4)]);
-        temp_offset += usage_map.length as usize - 4;
+        buffer[(temp_offset as usize)..((temp_offset + memo_string_row.length as usize - 4) as usize)].copy_from_slice(&mdb.page_buffer[(memo_string_row.start as usize + 4)..(memo_string_row.start as usize + 4 + memo_string_row.length as usize - 4)]);
+        temp_offset += memo_string_row.length as usize - 4;
 
-        page_row = get_u32(&usage_map.mdb.page_buffer, usage_map.start as usize);
+        page_row = get_u32(&mdb.page_buffer, memo_string_row.start as usize);
         if page_row == 0 {
           break;
         }
@@ -218,9 +209,9 @@ impl Column {
         eprintln!("Warning: incorrect memo length");
       }
 
-      decode_mdb_string(mdb.mdb_file.jet_version, mdb.encoding, &buffer[..temp_offset as usize])
+      decode_mdb_string(mdb.mdb_file.jet_version, mdb.encoding, &buffer[..temp_offset])
     } else {
-      Err(())
+      Err(MdbError::UnhandledType)
     }
   }
 

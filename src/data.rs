@@ -3,7 +3,7 @@ use crate::error::MdbError;
 use crate::mdbfile::{Mdb, PageTypes};
 use crate::table::{Table, TableStrategy};
 use crate::write::crack_row;
-use crate::map::{OldUsageMap, UsageMap};
+use crate::map::{UsageMap};
 
 const OFFSET_MASK: u16 = 0x1fff;
 
@@ -64,7 +64,7 @@ impl Table {
   /// An error may indicate an actual error or simply there is no next data page.
   pub fn read_next_data_page(&mut self) -> Result<(), MdbError> {
     loop {
-      let next_data_page = self.new_usage_map.get_next_free_page(self.current_page_number)?;
+      let next_data_page = self.usage_map.get_next_free_page(self.current_page_number)?;
 
       if next_data_page == self.current_page_number {
         return Err(MdbError::NextDataPageCycle);
@@ -144,7 +144,7 @@ impl Table {
   }
 }
 
-pub fn mdb_find_page_row_packed(mdb: &mut Mdb, page_row: u32) -> Result<OldUsageMap, ()> {
+pub fn mdb_find_page_row_packed(mdb: &mut Mdb, page_row: u32) -> Result<Row, MdbError> {
   // The row is stored in the bottom byte.
   let row: u8 = (page_row & 0x000000FF) as u8;
   // The page is stored in the top 3 bytes.
@@ -153,30 +153,21 @@ pub fn mdb_find_page_row_packed(mdb: &mut Mdb, page_row: u32) -> Result<OldUsage
   mdb_find_page_row(mdb, row, page as u32)
 }
 
-pub fn mdb_find_page_row(mdb: &mut Mdb, row: u8, page: u32) -> Result<OldUsageMap, ()> {
-  let mut mdb = mdb.clone();
-  if mdb.read_page(page).is_err() {
-    return Err(());
-  }
+pub fn mdb_find_page_row(mdb: &mut Mdb, row: u8, page: u32) -> Result<Row, MdbError> {
+  mdb.read_page(page)?;
 
-  let res = mdb_find_row(&mut mdb, row as u16)?;
-
-  Ok(OldUsageMap {
-    mdb,
-    start: res.start,
-    length: res.length,
-  })
+  mdb_find_row(mdb, row as u16)
 }
 
 pub struct Row {
-  start: u16,
-  length: u16,
+  pub(crate) start: u16,
+  pub(crate) length: u16,
 }
 
 /// Find a row assuming mdb has loaded the given page.
-pub fn mdb_find_row(mdb: &mut Mdb, row: u16) -> Result<Row, ()> {
+pub fn mdb_find_row(mdb: &mut Mdb, row: u16) -> Result<Row, MdbError> {
   if row > 1000 {
-    return Err(());
+    return Err(MdbError::RowTooLarge);
   }
 
   let offset = mdb.format.usage_row_count_offset + 2 + (row as usize) * 2;
@@ -185,8 +176,8 @@ pub fn mdb_find_row(mdb: &mut Mdb, row: u16) -> Result<Row, ()> {
   let length = next_start - (start & OFFSET_MASK);
 
   if (start & OFFSET_MASK) >= mdb.format.page_size as u16 || (start & OFFSET_MASK) > next_start || next_start > mdb.format.page_size as u16 {
-    //eprintln!("Invalid bounds for usage map.");
-    return Err(());
+    // eprintln!("Invalid bounds for usage map.");
+    return Err(MdbError::InvalidRowBounds);
   }
 
   Ok(Row {

@@ -56,7 +56,7 @@ pub fn read_catalog(mdb: &mut Mdb) -> Result<Vec<CatalogEntry>, ()> {
     }
   };
 
-  system_objects_table.read_columns()?;
+  system_objects_table.read_columns().expect("failed to read columns");
 
   let id_index = system_objects_table.find_column_index("Id").expect("Id column not found in system table.");
   let name_index = system_objects_table.find_column_index("Name").expect("Name column not found in system table.");

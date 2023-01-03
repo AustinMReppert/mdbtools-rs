@@ -1,15 +1,16 @@
 use encoding_rs::Encoding;
+use crate::error::MdbError;
 
 use crate::mdbfile::{MdbFormatVersion};
 
-pub fn decode_mdb_string(format: MdbFormatVersion, encoding: &'static Encoding, source: &[u8]) -> Result<String, ()> {
+pub fn decode_mdb_string(format: MdbFormatVersion, encoding: &'static Encoding, source: &[u8]) -> Result<String, MdbError> {
   let mut decoded_string: Vec<u8> = Vec::with_capacity(source.len() * 2);
   let result_string = if !(format == MdbFormatVersion::JET3) && (source.len() >= 2) && (source[0] == 0xff) && (source[1] == 0xfe) {
     decompress_unicode(&source[2..], &mut decoded_string);
     let (result_string, _encoding_used, had_errors) = encoding.decode(&decoded_string);
 
     if had_errors {
-      return Err(());
+      return Err(MdbError::DecodeString);
     }
 
     result_string
@@ -17,7 +18,7 @@ pub fn decode_mdb_string(format: MdbFormatVersion, encoding: &'static Encoding, 
     let (result_string, _encoding_used, had_errors) = encoding.decode(source);
 
     if had_errors {
-      return Err(());
+      return Err(MdbError::DecodeString);
     }
 
     result_string

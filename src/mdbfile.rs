@@ -160,16 +160,13 @@ impl Mdb {
   /// Read data into a buffer, advancing pages and setting the
   /// page cursor as needed.  In the case that buf in NULL, pages
   /// are still advanced and the page cursor is still updated.
-  pub fn read_page_if_n(&mut self, mut buffer_option: Option<&mut [u8]>, cur_pos: &mut u16, len: u16) -> Result<(), ()> {
+  pub fn read_page_if_n(&mut self, mut buffer_option: Option<&mut [u8]>, cur_pos: &mut u16, len: u16) -> Result<(), MdbError> {
     let mut len: usize = len as usize;
     let end = len;
     let mut buffer_offset: usize = 0;
 
     while *cur_pos >= self.format.page_size as u16 {
-      if self.read_page(self.get_u32(4)).is_err() {
-        return Err(());
-      }
-
+      self.read_page(self.get_u32(4))?;
       *cur_pos -= self.format.page_size as u16 - 8;
     }
 
@@ -180,17 +177,14 @@ impl Mdb {
         let buffer = buffer_option.as_mut().unwrap();
         if buffer_offset + piece_len > end {
           eprintln!("Buffer overflowed.");
-          return Err(());
+          return Err(MdbError::PageBufferOverflow);
         }
 
         buffer[buffer_offset..].copy_from_slice(&self.page_buffer.as_slice()[(*cur_pos as usize)..((*cur_pos as usize + piece_len) as usize)]);
         buffer_offset += piece_len;
       }
       len -= piece_len;
-      if self.read_page(self.get_u32(4)).is_err() {
-        eprintln!("Buffer overflowed.");
-        return Err(());
-      }
+      self.read_page(self.get_u32(4))?;
       *cur_pos = 8;
     }
 
@@ -198,7 +192,7 @@ impl Mdb {
       let buffer = buffer_option.as_mut().unwrap();
       if buffer_offset + len > end {
         eprintln!("Buffer overflowed.");
-        return Err(());
+        return Err(MdbError::PageBufferOverflow);
       }
 
       buffer[buffer_offset..(buffer_offset + len)].copy_from_slice(&self.page_buffer.as_slice()[(*cur_pos as usize)..(*cur_pos as usize + len)])
@@ -207,19 +201,16 @@ impl Mdb {
     Ok(())
   }
 
-  pub(crate) fn read_page_if_8(&mut self, cur_position: &mut u16) -> Result<u8, ()> {
+  pub(crate) fn read_page_if_8(&mut self, cur_position: &mut u16) -> Result<u8, MdbError> {
     let mut c: [u8; 1] = [0; 1];
-    if self.read_page_if_n(Some(&mut c), cur_position, 1).is_err() {
-      return Err(());
-    }
+    self.read_page_if_n(Some(&mut c), cur_position, 1)?;
+
     Ok(c[0])
   }
 
-  pub(crate) fn read_page_if_16(&mut self, cur_position: &mut u16) -> Result<u16, ()> {
+  pub(crate) fn read_page_if_16(&mut self, cur_position: &mut u16) -> Result<u16, MdbError> {
     let mut c: [u8; 2] = [0; 2];
-    if self.read_page_if_n(Some(&mut c), cur_position, 2).is_err() {
-      return Err(());
-    }
+    self.read_page_if_n(Some(&mut c), cur_position, 2)?;
     Ok((c[0] as u16) + ((c[1] as u16) << 8))
   }
 }
