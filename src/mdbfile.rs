@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use encoding_rs::{Encoding, UTF_16LE, WINDOWS_1252};
 
 use crate::{rc4, utils};
+use crate::error::MdbError;
 
 const MDB_PAGE_SIZE: usize = 4096;
 
@@ -21,10 +22,11 @@ pub struct Mdb {
 }
 
 impl Mdb {
-  pub fn open(path: PathBuf) -> Result<Mdb, &'static str> {
+  pub fn open(path: PathBuf) -> Result<Mdb, MdbError> {
     let file = match File::open(path) {
       Ok(f) => f,
-      Err(_e) => return Err("Could not open database.")
+      //Err(_e) => return Err("Could not open database.")
+      Err(_e) => return Err(MdbError::ReadPage)
     };
 
     let mut mdb = Mdb {
@@ -50,7 +52,8 @@ impl Mdb {
       }
     }
     if mdb.page_buffer[0] != 0 {
-      return Err("Couldn't open database. File is corrupt or not an database.");
+      //return Err("Couldn't open database. File is corrupt or not an database.");
+      return Err(MdbError::ReadPage)
     }
 
     let raw_version: u32 = mdb.page_buffer[0x14] as u32;
@@ -58,7 +61,7 @@ impl Mdb {
       Ok(mdb_version) => mdb_version,
       Err(_) => {
         eprintln!("Unknown Jet version: {}", raw_version);
-        return Err("Invalid Jet version");
+        return Err(MdbError::JetVersion);
       }
     };
     mdb.format = mdb.mdb_file.jet_version.get_format_constants();
@@ -80,7 +83,7 @@ impl Mdb {
     Ok(mdb)
   }
 
-  pub fn read_page(&mut self, page: u32) -> Result<(), &'static str> {
+  pub fn read_page(&mut self, page: u32) -> Result<(), MdbError> {
     if page != 0 && self.current_page == page {
       return Ok(());
     }
@@ -105,28 +108,32 @@ impl Mdb {
     self.page_buffer[offset]
   }
 
-  pub fn _mdb_read_page(&mut self, page: u32) -> Result<(), &'static str> {
+  pub fn _mdb_read_page(&mut self, page: u32) -> Result<(), MdbError> {
     let page_buffer = &mut self.page_buffer;
     let offset: u64 = page as u64 * self.format.page_size as u64;
 
     let seek_end = self.mdb_file.file.seek(SeekFrom::End(0));
     if seek_end.is_err() {
-      return Err("Unable to seek to end of file");
+      //return Err("Unable to seek to end of file");
+      return Err(MdbError::ReadPage);
     }
 
     if seek_end.unwrap() < offset {
-      return Err("Offset is beyond EOF");
+      //return Err("Offset is beyond EOF");
+      return Err(MdbError::ReadPage);
     }
 
     let seek_page = self.mdb_file.file.seek(SeekFrom::Start(offset));
     if seek_page.is_err() {
-      return Err("Failed to seek to page");
+      //return Err("Failed to seek to page");
+      return Err(MdbError::ReadPage);
     }
 
     //let page_buffer = &mut self.page_buffer;
     let res = self.mdb_file.file.read(page_buffer);
     if res.is_err() {
-      return Err("Failed to read page");
+      //return Err("Failed to read page");
+      return Err(MdbError::ReadPage);
     }
 
     let length = res.unwrap();

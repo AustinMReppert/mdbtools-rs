@@ -4,7 +4,8 @@ use crate::data::{mdb_find_page_row_packed};
 use crate::mdbfile::{Mdb, MdbFormatVersion};
 use crate::column::ColumnType;
 use crate::conversion::decode_mdb_string;
-use crate::map::UsageMap;
+use crate::map;
+use crate::map::{OldUsageMap, UsageMap};
 use crate::utils::get_u16;
 
 pub struct Table {
@@ -15,7 +16,7 @@ pub struct Table {
   pub first_data_page: u16,
   pub columns: Vec<Column>,
   real_index_count: u32,
-  pub current_page_number: u16,
+  pub current_page_number: u32,
   pub current_physical_page_number: u16,
   pub current_row: u16,
   pub is_temporary_table: bool,
@@ -23,7 +24,8 @@ pub struct Table {
   pub mdb: Mdb,
 
   pub(crate) first_table_definition_page: u32,
-  pub usage_map: UsageMap,
+  pub usage_map: OldUsageMap,
+  pub new_usage_map: UsageMap,
 }
 
 #[repr(u8)]
@@ -149,6 +151,8 @@ impl Table {
       }
     };
 
+    let new_usage_map = UsageMap::from_raw(&mdb, &usage_map.mdb.page_buffer[usage_map.start as usize..usage_map.start as usize + usage_map.length as usize]).expect("Failed to crate susage map");
+
     if usage_map.length < 1 {
       eprintln!("Error reading table invalid usage map size.");
       return Err(());
@@ -172,6 +176,7 @@ impl Table {
       mdb,
       first_table_definition_page: entry.page,
       usage_map,
+      new_usage_map,
     };
 
     Ok(table)

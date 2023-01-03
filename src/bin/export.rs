@@ -66,7 +66,7 @@ pub fn main() -> ExitCode {
   let mut mdb = match Mdb::open(args.file.clone()) {
     Ok(mdb) => mdb,
     Err(err) => {
-      eprintln!("{}", err);
+      //eprintln!("{}", err);
       return ExitCode::FAILURE;
     }
   };
@@ -135,7 +135,7 @@ pub fn main() -> ExitCode {
   }
 
   let null = args.null.unwrap_or(backend.default_null_str.to_string());
-
+println!("===================");
   let mut first = true;
   loop {
     let _result = match table.fetch_row() {

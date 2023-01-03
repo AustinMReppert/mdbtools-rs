@@ -48,7 +48,7 @@ pub fn main() -> ExitCode {
   let mut mdb = match Mdb::open(args.file) {
     Ok(mdb) => mdb,
     Err(err) => {
-      eprintln!("{}", err);
+      //eprintln!("{}", err);
       return ExitCode::FAILURE;
     },
   };

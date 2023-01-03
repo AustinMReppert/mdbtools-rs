@@ -1,3 +1,11 @@
+/*#![warn(
+clippy::all,
+clippy::restriction,
+clippy::pedantic,
+clippy::nursery,
+clippy::cargo,
+)]*/
+
 pub mod mdbfile;
 pub mod table;
 pub mod catalog;
@@ -12,3 +20,4 @@ pub mod money;
 pub mod time;
 pub mod numeric;
 pub mod backend;
+pub mod error;

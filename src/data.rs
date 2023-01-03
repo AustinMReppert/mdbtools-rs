@@ -1,13 +1,13 @@
 use crate::column::ColumnType;
+use crate::error::MdbError;
 use crate::mdbfile::{Mdb, PageTypes};
 use crate::table::{Table, TableStrategy};
 use crate::write::crack_row;
-use crate::map::UsageMap;
+use crate::map::{OldUsageMap, UsageMap};
 
 const OFFSET_MASK: u16 = 0x1fff;
 
 impl Table {
-
   /// Get the next row. If an error occurs, no more rows should be read.
   pub fn fetch_row(&mut self) -> Result<(), ()> {
     if self.current_page_number == 0 {
@@ -28,6 +28,7 @@ impl Table {
           self.current_row = 0;
 
           if self.read_next_data_page().is_err() {
+            //eprintln!("err data page");
             return Err(());
           }
         }
@@ -61,21 +62,37 @@ impl Table {
 
   /// Attempts to read the next data page of a table.
   /// An error may indicate an actual error or simply there is no next data page.
-  pub fn read_next_data_page(&mut self) -> Result<(), ()> {
-    // TODO: Add fast approach.
+  pub fn read_next_data_page(&mut self) -> Result<(), MdbError> {
     loop {
-      let res = self.mdb.read_page(self.current_page_number as u32);
-      self.current_page_number += 1;
-      if res.is_err() {
-        return Err(());
+      let next_data_page = self.new_usage_map.get_next_free_page(self.current_page_number)?;
+
+      if next_data_page == self.current_page_number {
+        return Err(MdbError::NextDataPageCycle);
       }
 
+      self.mdb.read_page(next_data_page)?;
+
+      self.current_page_number = next_data_page;
+
       if self.mdb.page_buffer[0] == PageTypes::PageData as u8 && self.mdb.get_u32(4) == self.first_table_definition_page {
-        break;
+        //println!("FOUND DATA PAGE AT: {}", next_data_page);
+        return Ok(());
       }
     }
 
-    Ok(())
+    // Keep as fallback.
+/*        loop {
+          let res = self.mdb.read_page(self.current_page_number as u32);
+          self.current_page_number += 1;
+          if res.is_err() {
+            return Err(MdbError::ReadPage);
+          }
+
+          if self.mdb.page_buffer[0] == PageTypes::PageData as u8 && self.mdb.get_u32(4) == self.first_table_definition_page {
+            break;
+          }
+        }
+        Ok(())*/
   }
 
   pub fn read_row(&mut self, row: u16) -> Result<(), ()> {
@@ -125,10 +142,9 @@ impl Table {
 
     Err(())
   }
-
 }
 
-pub fn mdb_find_page_row_packed(mdb: &mut Mdb, page_row: u32) -> Result<UsageMap, ()> {
+pub fn mdb_find_page_row_packed(mdb: &mut Mdb, page_row: u32) -> Result<OldUsageMap, ()> {
   // The row is stored in the bottom byte.
   let row: u8 = (page_row & 0x000000FF) as u8;
   // The page is stored in the top 3 bytes.
@@ -137,7 +153,7 @@ pub fn mdb_find_page_row_packed(mdb: &mut Mdb, page_row: u32) -> Result<UsageMap
   mdb_find_page_row(mdb, row, page as u32)
 }
 
-pub fn mdb_find_page_row(mdb: &mut Mdb, row: u8, page: u32) -> Result<UsageMap, ()> {
+pub fn mdb_find_page_row(mdb: &mut Mdb, row: u8, page: u32) -> Result<OldUsageMap, ()> {
   let mut mdb = mdb.clone();
   if mdb.read_page(page).is_err() {
     return Err(());
@@ -145,7 +161,7 @@ pub fn mdb_find_page_row(mdb: &mut Mdb, row: u8, page: u32) -> Result<UsageMap, 
 
   let res = mdb_find_row(&mut mdb, row as u16)?;
 
-  Ok(UsageMap {
+  Ok(OldUsageMap {
     mdb,
     start: res.start,
     length: res.length,
