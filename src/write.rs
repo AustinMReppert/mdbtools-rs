@@ -1,14 +1,12 @@
+use crate::error::MdbError;
 use crate::mdbfile::{MdbFormatVersion};
 use crate::mdbfile::MdbFormatVersion::JET3;
 use crate::table::Table;
 
-pub fn crack_row(table: &mut Table, row_start: u16, row_size: u16) -> Result<(), ()> {
-  //println!("=========================================");
+pub fn crack_row(table: &mut Table, row_start: u16, row_size: u16) -> Result<(), MdbError> {
   let row_start: usize = row_start as usize;
   let row_size: usize = row_size as usize;
   let row_end = row_start + row_size - 1;
-
-  //println!("{}", String::from_utf8_lossy(&table.mdb.page_buffer[row_start..row_start + row_size]));
 
   let row_cols: usize;
   let col_count_size: usize;
@@ -22,8 +20,8 @@ pub fn crack_row(table: &mut Table, row_start: u16, row_size: u16) -> Result<(),
 
   let bitmask_size: usize = (row_cols + 7) / 8;
   if bitmask_size + if table.mdb.mdb_file.jet_version == JET3 { 0 } else { 1 } >= row_end {
-    eprintln!("warning: Invalid page buffer detected in mdb_crack_row.");
-    return Err(());
+    //eprintln!("warning: Invalid page buffer detected in mdb_crack_row.");
+    return Err(MdbError::InvalidRowBuffer);
   }
 
   let nullmask = &table.mdb.page_buffer[row_end - bitmask_size + 1..];
@@ -34,44 +32,25 @@ pub fn crack_row(table: &mut Table, row_start: u16, row_size: u16) -> Result<(),
     row_var_cols = if table.mdb.mdb_file.jet_version == MdbFormatVersion::JET3 { table.mdb.get_u8(row_end - bitmask_size) as u16 } else { table.mdb.get_u16(row_end - bitmask_size - 1) };
     var_col_offsets.resize((row_var_cols + 1) as usize, 0);
 
-    let success: Result<(), ()> = if table.mdb.mdb_file.jet_version == MdbFormatVersion::JET3 {
+    if table.mdb.mdb_file.jet_version == MdbFormatVersion::JET3 {
       crack_jet_3_row(table, row_start, row_end, bitmask_size, row_var_cols as usize, var_col_offsets.as_mut_slice())
     } else {
       crack_jet_4_row(table, row_end, bitmask_size, row_var_cols as usize, var_col_offsets.as_mut_slice())
-    };
-    if success.is_err() {
-      eprintln!("warning: Invalid page buffer detected in mdb_crack_row.");
-      return Err(());
-    }
-
+    }?;
   }
 
   let row_fixed_cols = row_cols as u16 - row_var_cols;
 
-  /*println!("bitmask_sz {}", bitmask_size);
-  println!("row_var_cols {}", row_var_cols);
-  println!("row_fixed_cols {}", row_fixed_cols);*/
-
   let mut fixed_columns_found = 0;
   for col in &mut table.columns {
-    //println!("");
-    /*fields[i].column_number = i as u16;*/
-    /*fields[i].is_fixed = col.is_fixed;*/
     let byte_num: usize = (col.number / 8) as usize;
     let bit_num: usize = (col.number % 8) as usize;
-/*    println!("byte_num: {}", byte_num);
-    println!("bit_num: {}", bit_num);
-    println!("fixed: {}", col.is_fixed);
-    println!("col: {}", col.number);
-    println!("col: {}", col.name);*/
 
 
     col.buffer.is_null = !(byte_num < nullmask.len() && nullmask[byte_num] & (1 << bit_num) != 0);
     //TODO: fix below line
     if col.is_fixed && fixed_columns_found < row_fixed_cols {
       let col_start = col.fixed_offset as usize + col_count_size;
-      //println!("col_start: {}", col_start);
-      //println!("fixed_offset: {}", col.fixed_offset);
       col.buffer.start = row_start + col_start;
       col.buffer.value.resize(col.size as usize, 0);
       col.buffer.value.copy_from_slice(&table.mdb.page_buffer[row_start + col_start..(row_start + col_start + col.size as usize)]);
@@ -91,15 +70,15 @@ pub fn crack_row(table: &mut Table, row_start: u16, row_size: u16) -> Result<(),
       col.buffer.is_null = true;
     }
     if col.buffer.start + col.buffer.size as usize > row_start + row_size {
-      eprintln!("warning: Invalid data location detected in mdb_crack_row. Table: {} Column: {}", table.name, col.name);
-      return Err(());
+      //eprintln!("warning: Invalid data location detected in mdb_crack_row. Table: {} Column: {}", table.name, col.name);
+      return Err(MdbError::InvalidDataLocation);
     }
   }
-  //println!("=========================================");
+
   Ok(())
 }
 
-fn crack_jet_3_row(table: &Table, row_start: usize, row_end: usize, bitmask_size: usize, row_var_cols: usize, offsets: &mut [u32]) -> Result<(), ()> {
+fn crack_jet_3_row(table: &Table, row_start: usize, row_end: usize, bitmask_size: usize, row_var_cols: usize, offsets: &mut [u32]) -> Result<(), MdbError> {
   let row_len: usize = row_end - row_start + 1;
   let mut num_jumps: usize = (row_len - 1) / 256;
   let col_ptr = row_end - bitmask_size - num_jumps - 1;
@@ -108,11 +87,11 @@ fn crack_jet_3_row(table: &Table, row_start: usize, row_end: usize, bitmask_size
   }
 
   if bitmask_size + num_jumps + 1 > row_end {
-    return Err(());
+    return Err(MdbError::InvalidRowBuffer);
   }
 
   if col_ptr >= table.mdb.format.page_size || col_ptr < row_var_cols {
-    return Err(());
+    return Err(MdbError::InvalidRowBuffer);
   }
 
   let mut jumps_used = 0;
@@ -126,10 +105,10 @@ fn crack_jet_3_row(table: &Table, row_start: usize, row_end: usize, bitmask_size
   Ok(())
 }
 
-fn crack_jet_4_row(table: &Table, row_end: usize, bitmask_size: usize, row_var_cols: usize, offsets: &mut [u32]) -> Result<(), ()> {
+fn crack_jet_4_row(table: &Table, row_end: usize, bitmask_size: usize, row_var_cols: usize, offsets: &mut [u32]) -> Result<(), MdbError> {
 
   if bitmask_size + 3 + row_var_cols * 2 + 2 > row_end {
-    return Err(());
+    return Err(MdbError::InvalidRowBuffer);
   }
 
   for i in 0..(row_var_cols + 1) {

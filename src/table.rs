@@ -5,7 +5,6 @@ use crate::mdbfile::{Mdb, MdbFormatVersion};
 use crate::column::ColumnType;
 use crate::conversion::decode_mdb_string;
 use crate::error::MdbError;
-use crate::map;
 use crate::map::{UsageMap};
 use crate::utils::get_u16;
 

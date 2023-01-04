@@ -3,18 +3,17 @@ use crate::error::MdbError;
 use crate::mdbfile::{Mdb, PageTypes};
 use crate::table::{Table, TableStrategy};
 use crate::write::crack_row;
-use crate::map::{UsageMap};
 
 const OFFSET_MASK: u16 = 0x1fff;
 
 impl Table {
   /// Get the next row. If an error occurs, no more rows should be read.
-  pub fn fetch_row(&mut self) -> Result<(), ()> {
+  pub fn fetch_row(&mut self) -> Result<(), MdbError> {
     if self.current_page_number == 0 {
       self.current_page_number = 1;
       self.current_row = 0;
-      if (!self.is_temporary_table) && (self.strategy != TableStrategy::IndexScan) && self.read_next_data_page().is_err() {
-        return Err(());
+      if (!self.is_temporary_table) && (self.strategy != TableStrategy::IndexScan) {
+        self.read_next_data_page()?;
       }
     }
 
@@ -27,10 +26,7 @@ impl Table {
         if self.current_row >= rows {
           self.current_row = 0;
 
-          if self.read_next_data_page().is_err() {
-            //eprintln!("err data page");
-            return Err(());
-          }
+          self.read_next_data_page()?;
         }
       }
 
@@ -57,7 +53,7 @@ impl Table {
       }
     }
 
-    Err(())
+    Ok(())
   }
 
   /// Attempts to read the next data page of a table.
@@ -95,9 +91,9 @@ impl Table {
         Ok(())*/
   }
 
-  pub fn read_row(&mut self, row: u16) -> Result<(), ()> {
+  pub fn read_row(&mut self, row: u16) -> Result<(), MdbError> {
     if self.column_count == 0 || self.columns.is_empty() {
-      return Err(());
+      return Err(MdbError::InvalidRowNumber);
     }
 
     let mut row = match mdb_find_row(&mut self.mdb, row) {
@@ -108,11 +104,11 @@ impl Table {
         if row.length != 0 {
           row
         } else {
-          return Err(());
+          return Err(MdbError::InvalidRow);
         }
       }
       Err(_) => {
-        return Err(());
+        return Err(MdbError::InvalidRow);
       }
     };
 
@@ -128,20 +124,12 @@ impl Table {
     row.start &= OFFSET_MASK; /* remove flags */
 
     if deleted_flag != 0 {
-      return Err(());
+      return Err(MdbError::DeletedRow);
     }
 
-    match crack_row(self, row.start, row.length) {
-      Ok(_) => {
-        return Ok(());
-      }
-      Err(_) => {
-        eprintln!("Error reading row.")
-      }
-    }
-
-    Err(())
+    crack_row(self, row.start, row.length)
   }
+
 }
 
 pub fn mdb_find_page_row_packed(mdb: &mut Mdb, page_row: u32) -> Result<Row, MdbError> {
@@ -150,7 +138,7 @@ pub fn mdb_find_page_row_packed(mdb: &mut Mdb, page_row: u32) -> Result<Row, Mdb
   // The page is stored in the top 3 bytes.
   let page = (page_row & 0xFFFFFF00) >> 8;
 
-  mdb_find_page_row(mdb, row, page as u32)
+  mdb_find_page_row(mdb, row, page)
 }
 
 pub fn mdb_find_page_row(mdb: &mut Mdb, row: u8, page: u32) -> Result<Row, MdbError> {

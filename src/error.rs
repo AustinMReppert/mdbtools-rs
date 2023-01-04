@@ -23,5 +23,15 @@ pub enum MdbError {
   UnhandledType,
 
   ReadPage,
-  JetVersion
+  JetVersion,
+
+
+  // Row Related Errors
+  InvalidRowNumber,
+  InvalidRow,
+  DeletedRow,
+
+  // Cracking Row Errors
+  InvalidRowBuffer,
+  InvalidDataLocation
 }

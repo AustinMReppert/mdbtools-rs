@@ -14,7 +14,7 @@ pub struct UsageMap {
 
 impl UsageMap {
   /// Loads a usage map from the raw mdb bytes.
-  pub fn from_raw(mdb: &mut Mdb, buffer: &[u8]) -> Result<(UsageMap), MdbError> {
+  pub fn from_raw(mdb: &mut Mdb, buffer: &[u8]) -> Result<UsageMap, MdbError> {
 
     if buffer.is_empty() {
       return Err(MdbError::UsageMapInvalidSize);

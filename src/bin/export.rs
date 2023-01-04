@@ -9,6 +9,7 @@ use mdbtools::backend::Backend;
 use mdbtools::mdbfile::Mdb;
 use mdbtools::catalog::{CatalogEntry, read_catalog, TableCatalogEntry};
 use mdbtools::column::ColumnType;
+use mdbtools::error::MdbError;
 use mdbtools::table::Table;
 
 /// Get listing of tables in an MDB database
@@ -98,7 +99,13 @@ pub fn main() -> ExitCode {
 
   let table_catalog_entry = table_catalog_entry.unwrap();
   let mut table = Table::from_catalog_entry(CatalogEntry::Table(table_catalog_entry), &mut mdb).expect("Could not read table.");
-  let columns = table.read_columns().expect("Could not read table.");
+  match table.read_columns() {
+    Ok(_) => {},
+    Err(_) => {
+      eprintln!("Could not read columns.");
+      return ExitCode::FAILURE;
+    }
+  }
 
   let backend_name = args.backend.to_lowercase();
   let backends: Vec<Backend> = vec![backend::CSV_BACKEND, backend::MSSQL_BACKEND, backend::POSTGRES_BACKEND];
