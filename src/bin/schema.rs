@@ -71,8 +71,7 @@ pub fn main() -> ExitCode {
 
   let mut mdb = match Mdb::open(args.file.clone()) {
     Ok(mdb) => mdb,
-    Err(err) => {
-      //eprintln!("{}", err);
+    Err(_err) => {
       return ExitCode::FAILURE;
     }
   };
@@ -105,7 +104,7 @@ fn print_table_schema(table: TableCatalogEntry, args: &Args, mdb: &mut Mdb, back
   }
 
   let mut table = Table::from_catalog_entry(CatalogEntry::Table(table), mdb).expect("Could not read table.");
-  let columns = table.read_columns().expect("Could not read table.");
+  table.read_columns().expect("Could not read table.");
 
   let schema_name = args.schema.as_deref().unwrap_or(&String::new()).to_string();
   let quoted_schema_name = if schema_name.is_empty() {schema_name.clone()} else {(backend.quote_name)(&schema_name) + "."};

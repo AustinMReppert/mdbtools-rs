@@ -36,7 +36,7 @@ impl<'a> Eq for Backend<'a> {
 
 }
 
-trait QuoteName {
+pub trait QuoteName {
   fn quote_name(&self, name: String) -> String;
 }
 

@@ -81,7 +81,7 @@ impl Column {
 }
 
 #[repr(u8)]
-#[derive(PartialEq, Copy, Clone)]
+#[derive(PartialEq, Copy, Clone, Debug)]
 pub enum ColumnType {
   Bool = 0x01,
   Byte = 0x02,

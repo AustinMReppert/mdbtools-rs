@@ -1,15 +1,14 @@
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use clap::{Parser, ColorChoice};
+use clap::{ColorChoice, Parser};
 
 use mdbtools;
 use mdbtools::backend;
 use mdbtools::backend::Backend;
-use mdbtools::mdbfile::Mdb;
-use mdbtools::catalog::{CatalogEntry, read_catalog, TableCatalogEntry};
+use mdbtools::catalog::{read_catalog, CatalogEntry, TableCatalogEntry};
 use mdbtools::column::ColumnType;
-use mdbtools::error::MdbError;
+use mdbtools::mdbfile::Mdb;
 use mdbtools::table::Table;
 
 /// Get listing of tables in an MDB database
@@ -66,8 +65,7 @@ pub fn main() -> ExitCode {
 
   let mut mdb = match Mdb::open(args.file.clone()) {
     Ok(mdb) => mdb,
-    Err(err) => {
-      //eprintln!("{}", err);
+    Err(_err) => {
       return ExitCode::FAILURE;
     }
   };

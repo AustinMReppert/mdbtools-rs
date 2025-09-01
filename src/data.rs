@@ -117,10 +117,10 @@ impl Table {
       deleted_flag += 1;
     }
 
-    let mut lookup_flag = 0;
+    /*let mut lookup_flag = 0;
     if row.start & 0x8000 != 0 {
       lookup_flag += 1;
-    }
+    }*/
     row.start &= OFFSET_MASK; /* remove flags */
 
     if deleted_flag != 0 {

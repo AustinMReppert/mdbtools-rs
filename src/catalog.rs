@@ -62,14 +62,14 @@ pub fn read_catalog(mdb: &mut Mdb) -> Result<Vec<CatalogEntry>, ()> {
   let name_index = system_objects_table.find_column_index("Name").expect("Name column not found in system table.");
   let type_index = system_objects_table.find_column_index("Type").expect("Type column not found in system table.");
   let flags_index = system_objects_table.find_column_index("Flags").expect("Flags column not found in system table.");
-  let properties_index = system_objects_table.find_column_index("LvProp").expect("LvProp column not found in system table.");
+  //let properties_index = system_objects_table.find_column_index("LvProp").expect("LvProp column not found in system table.");
 
   while let Ok(_row) = system_objects_table.fetch_row() {
     let id_column = &system_objects_table.columns[id_index];
     let name_column = &system_objects_table.columns[name_index];
     let type_column = &system_objects_table.columns[type_index];
     let flags_column = &system_objects_table.columns[flags_index];
-    let properties_column = &system_objects_table.columns[properties_index];
+    //let properties_column = &system_objects_table.columns[properties_index];
 
     let entry_type = get_u16(&type_column.buffer.value, 0);
     let name = system_objects_table.mdb.encoding.decode(&name_column.buffer.value).0.to_string();

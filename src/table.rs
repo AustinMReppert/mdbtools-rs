@@ -104,10 +104,6 @@ impl Table {
     let mut mdb: Mdb = mdb.clone();
     let entry: TableCatalogEntry = match entry {
       CatalogEntry::Table(entry) => entry,
-      _ => {
-        eprintln!("Trying to read non table catalog entry.");
-        return Err(MdbError::ReadNonTableCatalogueEntry);
-      }
     };
 
     mdb.read_page(entry.page)?;
